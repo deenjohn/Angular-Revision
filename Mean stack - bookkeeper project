@@ -1,0 +1,242 @@
+
+# server.js
+
+var express = require('express');
+var path = require('path');
+var favicon = require('serve-favicon');
+var logger = require('morgan');
+var cookieParser = require('cookie-parser');
+var bodyParser = require('body-parser');
+
+var routes = require('./server/routes/index');
+var users = require('./server/routes/users');
+var books = require('./server/routes/books');
+
+var app = express();
+
+// view engine setup
+app.set('views', path.join(__dirname, '/server/views'));
+app.set('view engine', 'jade');
+
+app.use(favicon(path.join(__dirname, 'public/favicon.ico')));
+app.use(logger('dev'));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(cookieParser());
+app.use(express.static(path.join(__dirname, 'public'))); //will search for index.html here
+
+app.use('/', routes);
+app.use('/api/users', users);
+app.use('/api/books', books);
+
+//catch*/// 404 and forward to error handler
+app.use(function(req, res, next) {
+    var err = new Error('Not Found');
+    err.status = 404;
+    next(err);
+});
+
+// error handlers
+
+// development error handler
+// will print stacktrace
+if (app.get('env') === 'development') {
+    app.use(function(err, req, res, next) {
+        res.status(err.status || 500);
+        res.render('error', {
+            message: err.message,
+            error: err
+        });
+    });
+}
+
+# production error handler
+# no stacktraces leaked to user
+app.use(function(err, req, res, next) {
+    res.status(err.status || 500);
+    res.render('error', {
+        message: err.message,
+        error: {}
+    });
+});
+
+var debug = require('debug')('server');
+
+app.set('port', process.env.PORT || 3000);
+
+app.listen(app.get('port'));
+
+console.log('Listening on port: ' + app.get('port'));
+
+module.exports = app;
+
+
+# index.html
+
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/bootstrap-theme.min.css" rel="stylesheet">
+</head>
+<body ng-app="app">
+
+<h1>Book Logger</h1>
+
+<div ng-view></div> 
+
+
+<script src="JS/angular.min.js"></script>
+<script src="JS/angular-route.min.js"></script>
+<script src="JS/angular-cookies.min.js"></script>
+<script src="app/app.js"></script>
+<script src="app/books/BooksController.js"></script>
+<script src="app/books/AddBookController.js"></script>
+<script src="app/books/EditBookController.js"></script>
+<script src="app/services/dataService.js"></script>
+<script src="app/services/loggerService.js"></script>
+<script src="app/services/constantService.js"></script>
+<script src="app/services/badgeService.js"></script>
+</body>
+</html>
+
+
+# app.js
+
+(function() {
+
+    var app = angular.module('app', ['ngRoute', 'ngCookies']);
+
+    app.provider('books', ['constants', function (constants) {
+
+        var includeVersionInTitle = false;
+        this.setIncludeVersionInTitle = function (value) {
+            includeVersionInTitle = value;
+        };
+
+        this.$get = function () {
+
+            var appName = constants.APP_TITLE;
+            var version = constants.APP_VERSION;
+
+            if (includeVersionInTitle) {
+                appName += ' ' + version;
+            }
+
+            var appDesc = constants.APP_DESCRIPTION;
+
+            return {
+                appName: appName,
+                appDesc: appDesc
+            };
+        };
+
+    }]);
+
+    app.config(['booksProvider', '$routeProvider', '$logProvider', function (booksProvider, $routeProvider, $logProvider) {
+
+        booksProvider.setIncludeVersionInTitle(true);
+        $logProvider.debugEnabled(false);
+
+        $routeProvider
+            .when('/', {
+                templateUrl: '/app/templates/books.html',
+                controller: 'BooksController',
+                controllerAs: 'books'
+            })
+            .when('/AddBook', {
+                templateUrl: '/app/templates/addBook.html',
+                controller: 'AddBookController',
+                controllerAs: 'addBook'
+            })
+            .when('/EditBook/:bookID', {
+                templateUrl: '/app/templates/editBook.html',
+                controller: 'EditBookController',
+                controllerAs: 'bookEditor',
+                resolve: {
+                    books: function (dataService) {
+                        //throw 'error getting books';
+                        return dataService.getAllBooks();
+                    }
+                }
+            })
+            .otherwise('/');
+
+    }]);
+
+    app.run(['$rootScope', function($rootScope) {
+
+        $rootScope.$on('$routeChangeSuccess', function(event, current, previous) {
+
+            //console.log('successfully changed routes');
+
+        });
+
+        $rootScope.$on('$routeChangeError', function(event, current, previous, rejection) {
+
+            console.log('error changing routes');
+
+            console.log(event);
+            console.log(current);
+            console.log(previous);
+            console.log(rejection);
+
+        });
+
+    }]);
+
+}());
+
+
+# book.html
+
+<h3>All Books</h3>
+<div>
+    <ul>
+        <li ng-repeat="book in books.allBooks">{{ book.title }} - {{ book.author }} <a href="#/EditBook/{{ book.book_id }}">Edit</a> </li>
+    </ul>
+</div>
+
+<a href="#/AddBook">Add New Book</a>
+<a href="#/EditBook/{{ books.lastEdited.book_id }}">Open Last Edited</a>
+
+<h3>All Readers</h3>
+<div>
+    <ul>
+        <li ng-repeat="reader in books.allReaders">{{ reader.name }} - {{ books.getBadge(reader.totalMinutesRead) }}</li>
+    </ul>
+</div>
+
+
+<h3>Current Favorite Book</h3>
+<div>
+    {{ books.favoriteBook }}
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
